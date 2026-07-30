@@ -16,10 +16,15 @@ logger = logging.getLogger(__name__)
 
 BUCKET_NAME = os.environ.get("BUCKET_NAME")
 
-storage_client = storage.Client()
+
+def get_storage_client() -> storage.Client:
+    """Create the Cloud Storage client when it is actually needed."""
+    return storage.Client()
 
 
-def decode_pubsub_message(envelope: dict[str, Any]) -> tuple[dict[str, Any], str]:
+def decode_pubsub_message(
+    envelope: dict[str, Any],
+) -> tuple[dict[str, Any], str]:
     """
     Decode a wrapped Pub/Sub push message.
 
@@ -31,7 +36,9 @@ def decode_pubsub_message(envelope: dict[str, Any]) -> tuple[dict[str, Any], str
     message = envelope.get("message")
 
     if not isinstance(message, dict):
-        raise ValueError("Request body does not contain a valid 'message' object.")
+        raise ValueError(
+            "Request body does not contain a valid 'message' object."
+        )
 
     encoded_data = message.get("data")
     message_id = message.get("messageId") or message.get("message_id")
@@ -47,7 +54,9 @@ def decode_pubsub_message(envelope: dict[str, Any]) -> tuple[dict[str, Any], str
         decoded_text = decoded_bytes.decode("utf-8")
         payload = json.loads(decoded_text)
     except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise ValueError("Pub/Sub message data is not valid base64-encoded JSON.") from exc
+        raise ValueError(
+            "Pub/Sub message data is not valid base64-encoded JSON."
+        ) from exc
 
     if not isinstance(payload, dict):
         raise ValueError("Decoded event payload must be a JSON object.")
@@ -65,7 +74,7 @@ def build_object_name(message_id: str) -> str:
     now = datetime.now(timezone.utc)
 
     return (
-        f"raw-events/"
+        "raw-events/"
         f"year={now:%Y}/"
         f"month={now:%m}/"
         f"day={now:%d}/"
@@ -79,7 +88,9 @@ def write_event_to_gcs(
     envelope: dict[str, Any],
 ) -> str:
     if not BUCKET_NAME:
-        raise RuntimeError("BUCKET_NAME environment variable is not configured.")
+        raise RuntimeError(
+            "BUCKET_NAME environment variable is not configured."
+        )
 
     object_name = build_object_name(message_id)
 
@@ -90,11 +101,16 @@ def write_event_to_gcs(
         "payload": payload,
     }
 
+    storage_client = get_storage_client()
     bucket = storage_client.bucket(BUCKET_NAME)
     blob = bucket.blob(object_name)
 
     blob.upload_from_string(
-        json.dumps(stored_event, separators=(",", ":"), ensure_ascii=False),
+        json.dumps(
+            stored_event,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ),
         content_type="application/json",
     )
 
@@ -117,7 +133,9 @@ def receive_pubsub_message() -> Response:
 
     if not isinstance(envelope, dict):
         logger.warning("Request body is not valid JSON.")
-        return jsonify({"error": "Request body must be valid JSON."}), 400
+        return jsonify(
+            {"error": "Request body must be valid JSON."}
+        ), 400
 
     try:
         payload, message_id = decode_pubsub_message(envelope)
@@ -137,12 +155,11 @@ def receive_pubsub_message() -> Response:
         return Response(status=204)
 
     except ValueError as exc:
-        # Permanent payload problem. Returning 204 prevents endless retries.
         logger.warning("Rejected invalid message: %s", exc)
         return Response(status=204)
 
     except Exception:
-        # Temporary infrastructure or application failure.
-        # Returning 500 tells Pub/Sub to retry the message.
         logger.exception("Failed to process Pub/Sub message.")
-        return jsonify({"error": "Internal processing failure."}), 500
+        return jsonify(
+            {"error": "Internal processing failure."}
+        ), 500
