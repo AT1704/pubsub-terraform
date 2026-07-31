@@ -187,6 +187,14 @@ def receive_pubsub_message() -> Response:
             2,
         )
 
+        payload_size_bytes = len(
+            json.dumps(
+                payload,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            ).encode("utf-8")
+        )
+
         logger.info(
             "Event uploaded successfully.",
             extra={
@@ -195,6 +203,7 @@ def receive_pubsub_message() -> Response:
                 "bucket_name": BUCKET_NAME,
                 "object_name": object_name,
                 "processing_time_ms": processing_time_ms,
+                "payload_size_bytes": payload_size_bytes,
             },
         )
 
