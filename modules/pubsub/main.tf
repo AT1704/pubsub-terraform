@@ -46,3 +46,16 @@ resource "google_pubsub_topic" "dead_letter" {
   project = var.project_id
   name    = var.dead_letter_topic_name
 }
+
+resource "google_pubsub_subscription" "dead_letter" {
+  project = var.project_id
+  name    = var.dead_letter_subscription_name
+  topic   = google_pubsub_topic.dead_letter.id
+
+  ack_deadline_seconds       = 20
+  message_retention_duration = "604800s"
+
+  expiration_policy {
+    ttl = "2678400s"
+  }
+}

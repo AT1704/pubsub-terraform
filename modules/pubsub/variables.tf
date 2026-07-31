@@ -90,3 +90,8 @@ variable "maximum_backoff" {
   type        = string
   default     = "60s"
 }
+
+variable "dead_letter_subscription_name" {
+  description = "Name of the subscription attached to the dead-letter topic."
+  type        = string
+}

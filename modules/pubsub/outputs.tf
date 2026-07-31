@@ -22,3 +22,8 @@ output "dead_letter_topic_id" {
   description = "Fully qualified dead-letter topic ID."
   value       = google_pubsub_topic.dead_letter.id
 }
+
+output "dead_letter_subscription_id" {
+  description = "Fully qualified dead-letter subscription ID."
+  value       = google_pubsub_subscription.dead_letter.id
+}

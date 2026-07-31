@@ -1,19 +1,21 @@
 module "pubsub" {
   source = "./modules/pubsub"
 
-  project_id           = var.project_id
-  topic_name           = local.pubsub_topic_name
-  subscription_name    = local.pubsub_subscription_name
-  ack_deadline_seconds = 20
+  project_id                    = var.project_id
+  topic_name                    = local.pubsub_topic_name
+  subscription_name             = local.pubsub_subscription_name
+  dead_letter_topic_name        = "orders-dead-letter-topic"
+  dead_letter_subscription_name = "orders-dead-letter-subscription"
+  ack_deadline_seconds          = 20
 
   push_endpoint              = module.data_mover_cloudrun.service_uri
   push_service_account_email = module.pubsub_push_invoker_iam.service_account_email
   push_audience              = module.data_mover_cloudrun.service_uri
 
-  dead_letter_topic_name = local.dead_letter_topic_name
-  max_delivery_attempts  = 5
-  minimum_backoff        = "10s"
-  maximum_backoff        = "60s"
+
+  max_delivery_attempts = 5
+  minimum_backoff       = "10s"
+  maximum_backoff       = "60s"
 }
 
 module "raw_data_bucket" {

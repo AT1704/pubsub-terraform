@@ -2,17 +2,20 @@ import base64
 import json
 import logging
 import os
+import time
 from datetime import datetime, timezone
 from typing import Any
 
 from flask import Flask, Response, jsonify, request
 from google.cloud import storage
 
+from app.logging_config import configure_logging
+
+configure_logging()
+
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 BUCKET_NAME = os.environ.get("BUCKET_NAME")
 
@@ -32,9 +35,6 @@ def decode_pubsub_message(
         A tuple containing:
         - decoded JSON payload
         - Pub/Sub message ID
-
-    Raises:
-        ValueError: If the envelope or encoded message data is invalid.
     """
     message = envelope.get("message")
 
@@ -78,12 +78,8 @@ def decode_pubsub_message(
 
 
 def build_object_name(message_id: str) -> str:
-    """
-    Build a deterministic Cloud Storage object name.
+    """Build a deterministic Cloud Storage object name."""
 
-    Using the Pub/Sub message ID means that repeated deliveries overwrite
-    the same object instead of creating duplicate files.
-    """
     now = datetime.now(timezone.utc)
 
     return (
@@ -100,16 +96,8 @@ def write_event_to_gcs(
     message_id: str,
     envelope: dict[str, Any],
 ) -> str:
-    """
-    Store a processed Pub/Sub event in Cloud Storage.
+    """Store a processed Pub/Sub event in Cloud Storage."""
 
-    Returns:
-        The object name created in Cloud Storage.
-
-    Raises:
-        RuntimeError: If the bucket environment variable is missing.
-        Exception: If the Cloud Storage upload fails.
-    """
     if not BUCKET_NAME:
         raise RuntimeError(
             "BUCKET_NAME environment variable is not configured."
@@ -143,6 +131,7 @@ def write_event_to_gcs(
 @app.get("/health")
 def health() -> Response:
     """Return the service health status."""
+
     return jsonify(
         {
             "status": "healthy",
@@ -156,24 +145,30 @@ def receive_pubsub_message() -> Response:
     """
     Receive a wrapped Pub/Sub push message.
 
-    Response behavior:
-        204: Message processed successfully.
-        400: Message is malformed or invalid.
-        500: Message processing failed unexpectedly.
-
-    Pub/Sub retries non-success responses. Invalid and failed messages can
-    therefore eventually be forwarded to the configured dead-letter topic.
+    204 -> Success
+    400 -> Invalid Pub/Sub message
+    500 -> Internal processing failure
     """
+
+    start_time = time.perf_counter()
+
     envelope = request.get_json(silent=True)
 
     if not isinstance(envelope, dict):
-        logger.warning("Request body is not valid JSON.")
+        logger.warning(
+            "Request body is not valid JSON.",
+            extra={
+                "event": "invalid_request",
+            },
+        )
 
         return jsonify(
             {
                 "error": "Request body must be valid JSON.",
             }
         ), 400
+
+    message_id = None
 
     try:
         payload, message_id = decode_pubsub_message(envelope)
@@ -184,18 +179,33 @@ def receive_pubsub_message() -> Response:
             envelope=envelope,
         )
 
+        processing_time_ms = round(
+            (time.perf_counter() - start_time) * 1000,
+            2,
+        )
+
         logger.info(
-            "Processed Pub/Sub message message_id=%s object=%s",
-            message_id,
-            object_name,
+            "Event uploaded successfully.",
+            extra={
+                "event": "event_uploaded",
+                "message_id": message_id,
+                "bucket_name": BUCKET_NAME,
+                "object_name": object_name,
+                "processing_time_ms": processing_time_ms,
+            },
         )
 
         return Response(status=204)
 
     except ValueError as exc:
         logger.warning(
-            "Rejected invalid Pub/Sub message: %s",
-            exc,
+            "Invalid Pub/Sub message.",
+            extra={
+                "event": "invalid_pubsub_message",
+                "message_id": message_id,
+                "error_type": type(exc).__name__,
+                "error_details": str(exc),
+            },
         )
 
         return jsonify(
@@ -207,7 +217,12 @@ def receive_pubsub_message() -> Response:
 
     except Exception:
         logger.exception(
-            "Failed to process Pub/Sub message."
+            "Event processing failed.",
+            extra={
+                "event": "event_processing_failed",
+                "message_id": message_id,
+                "bucket_name": BUCKET_NAME,
+            },
         )
 
         return jsonify(

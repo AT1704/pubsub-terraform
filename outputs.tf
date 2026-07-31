@@ -81,3 +81,8 @@ output "dead_letter_topic_id" {
   description = "Dead-letter topic ID."
   value       = module.pubsub.dead_letter_topic_id
 }
+
+output "dead_letter_subscription_id" {
+  description = "Dead-letter subscription ID."
+  value       = module.pubsub.dead_letter_subscription_id
+}
