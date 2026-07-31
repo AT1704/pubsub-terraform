@@ -11,7 +11,7 @@ RUN pip install \
     --no-cache-dir \
     --requirement requirements.txt
 
-COPY main.py .
+COPY main.py logging_config.py ./
 
 RUN useradd \
     --create-home \
