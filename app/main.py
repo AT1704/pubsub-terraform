@@ -9,7 +9,10 @@ from typing import Any
 from flask import Flask, Response, jsonify, request
 from google.cloud import storage
 
-from app.logging_config import configure_logging
+try:
+    from .logging_config import configure_logging
+except ImportError:
+    from logging_config import configure_logging
 
 configure_logging()
 
