@@ -18,7 +18,7 @@ BUCKET_NAME = os.environ.get("BUCKET_NAME")
 
 
 def get_storage_client() -> storage.Client:
-    """Create the Cloud Storage client when it is actually needed."""
+    """Create the Cloud Storage client only when it is needed."""
     return storage.Client()
 
 
@@ -32,6 +32,9 @@ def decode_pubsub_message(
         A tuple containing:
         - decoded JSON payload
         - Pub/Sub message ID
+
+    Raises:
+        ValueError: If the envelope or encoded message data is invalid.
     """
     message = envelope.get("message")
 
@@ -50,16 +53,26 @@ def decode_pubsub_message(
         raise ValueError("Pub/Sub message does not contain a message ID.")
 
     try:
-        decoded_bytes = base64.b64decode(encoded_data, validate=True)
+        decoded_bytes = base64.b64decode(
+            encoded_data,
+            validate=True,
+        )
         decoded_text = decoded_bytes.decode("utf-8")
         payload = json.loads(decoded_text)
-    except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+
+    except (
+        ValueError,
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+    ) as exc:
         raise ValueError(
             "Pub/Sub message data is not valid base64-encoded JSON."
         ) from exc
 
     if not isinstance(payload, dict):
-        raise ValueError("Decoded event payload must be a JSON object.")
+        raise ValueError(
+            "Decoded event payload must be a JSON object."
+        )
 
     return payload, str(message_id)
 
@@ -68,7 +81,7 @@ def build_object_name(message_id: str) -> str:
     """
     Build a deterministic Cloud Storage object name.
 
-    Using the Pub/Sub message ID helps make repeated deliveries overwrite
+    Using the Pub/Sub message ID means that repeated deliveries overwrite
     the same object instead of creating duplicate files.
     """
     now = datetime.now(timezone.utc)
@@ -87,6 +100,16 @@ def write_event_to_gcs(
     message_id: str,
     envelope: dict[str, Any],
 ) -> str:
+    """
+    Store a processed Pub/Sub event in Cloud Storage.
+
+    Returns:
+        The object name created in Cloud Storage.
+
+    Raises:
+        RuntimeError: If the bucket environment variable is missing.
+        Exception: If the Cloud Storage upload fails.
+    """
     if not BUCKET_NAME:
         raise RuntimeError(
             "BUCKET_NAME environment variable is not configured."
@@ -119,6 +142,7 @@ def write_event_to_gcs(
 
 @app.get("/health")
 def health() -> Response:
+    """Return the service health status."""
     return jsonify(
         {
             "status": "healthy",
@@ -129,12 +153,26 @@ def health() -> Response:
 
 @app.post("/")
 def receive_pubsub_message() -> Response:
+    """
+    Receive a wrapped Pub/Sub push message.
+
+    Response behavior:
+        204: Message processed successfully.
+        400: Message is malformed or invalid.
+        500: Message processing failed unexpectedly.
+
+    Pub/Sub retries non-success responses. Invalid and failed messages can
+    therefore eventually be forwarded to the configured dead-letter topic.
+    """
     envelope = request.get_json(silent=True)
 
     if not isinstance(envelope, dict):
         logger.warning("Request body is not valid JSON.")
+
         return jsonify(
-            {"error": "Request body must be valid JSON."}
+            {
+                "error": "Request body must be valid JSON.",
+            }
         ), 400
 
     try:
@@ -155,11 +193,34 @@ def receive_pubsub_message() -> Response:
         return Response(status=204)
 
     except ValueError as exc:
-        logger.warning("Rejected invalid message: %s", exc)
-        return Response(status=204)
+        logger.warning(
+            "Rejected invalid Pub/Sub message: %s",
+            exc,
+        )
+
+        return jsonify(
+            {
+                "error": "Invalid Pub/Sub message.",
+                "details": str(exc),
+            }
+        ), 400
 
     except Exception:
-        logger.exception("Failed to process Pub/Sub message.")
+        logger.exception(
+            "Failed to process Pub/Sub message."
+        )
+
         return jsonify(
-            {"error": "Internal processing failure."}
+            {
+                "error": "Internal processing failure.",
+            }
         ), 500
+
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", "8080"))
+
+    app.run(
+        host="0.0.0.0",
+        port=port,
+    )

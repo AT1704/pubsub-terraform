@@ -13,6 +13,15 @@ resource "google_pubsub_subscription" "this" {
   topic   = google_pubsub_topic.this.id
 
   ack_deadline_seconds = var.ack_deadline_seconds
+  dead_letter_policy {
+    dead_letter_topic     = google_pubsub_topic.dead_letter.id
+    max_delivery_attempts = var.max_delivery_attempts
+  }
+
+  retry_policy {
+    minimum_backoff = var.minimum_backoff
+    maximum_backoff = var.maximum_backoff
+  }
 
   dynamic "push_config" {
     for_each = var.push_endpoint == null ? [] : [1]
@@ -31,4 +40,9 @@ resource "google_pubsub_subscription" "this" {
       }
     }
   }
+}
+
+resource "google_pubsub_topic" "dead_letter" {
+  project = var.project_id
+  name    = var.dead_letter_topic_name
 }

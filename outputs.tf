@@ -76,3 +76,8 @@ output "artifact_registry_repository_uri" {
   description = "Docker repository URI"
   value       = module.artifact_registry.repository_uri
 }
+
+output "dead_letter_topic_id" {
+  description = "Dead-letter topic ID."
+  value       = module.pubsub.dead_letter_topic_id
+}

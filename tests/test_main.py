@@ -37,7 +37,10 @@ def client():
 
 def test_decode_pubsub_message_returns_payload_and_message_id():
     envelope = build_pubsub_envelope(
-        payload={"order_id": "order-1002", "status": "created"},
+        payload={
+            "order_id": "order-1002",
+            "status": "created",
+        },
         message_id="12345",
     )
 
@@ -77,7 +80,11 @@ def test_health_endpoint_reports_bucket_configuration(
     client,
     monkeypatch,
 ):
-    monkeypatch.setattr(main, "BUCKET_NAME", "test-bucket")
+    monkeypatch.setattr(
+        main,
+        "BUCKET_NAME",
+        "test-bucket",
+    )
 
     response = client.get("/health")
 
@@ -99,7 +106,11 @@ def test_valid_pubsub_message_is_written_to_gcs(
     mock_storage_client.bucket.return_value = mock_bucket
     mock_bucket.blob.return_value = mock_blob
 
-    monkeypatch.setattr(main, "BUCKET_NAME", "test-bucket")
+    monkeypatch.setattr(
+        main,
+        "BUCKET_NAME",
+        "test-bucket",
+    )
     monkeypatch.setattr(
         main,
         "get_storage_client",
@@ -112,7 +123,10 @@ def test_valid_pubsub_message_is_written_to_gcs(
     )
 
     envelope = build_pubsub_envelope(
-        payload={"order_id": "order-1002", "status": "created"},
+        payload={
+            "order_id": "order-1002",
+            "status": "created",
+        },
         message_id="12345",
     )
 
@@ -138,7 +152,10 @@ def test_valid_pubsub_message_is_written_to_gcs(
         "order_id": "order-1002",
         "status": "created",
     }
-    assert uploaded_event["subscription"] == envelope["subscription"]
+    assert (
+        uploaded_event["subscription"]
+        == envelope["subscription"]
+    )
 
     assert (
         mock_blob.upload_from_string.call_args.kwargs[
@@ -148,7 +165,7 @@ def test_valid_pubsub_message_is_written_to_gcs(
     )
 
 
-def test_invalid_pubsub_payload_returns_204(
+def test_invalid_pubsub_payload_returns_400(
     client,
     monkeypatch,
 ):
@@ -169,7 +186,15 @@ def test_invalid_pubsub_payload_returns_204(
 
     response = client.post("/", json=envelope)
 
-    assert response.status_code == 204
+    assert response.status_code == 400
+    assert response.get_json() == {
+        "error": "Invalid Pub/Sub message.",
+        "details": (
+            "Pub/Sub message data is not valid "
+            "base64-encoded JSON."
+        ),
+    }
+
     mock_write.assert_not_called()
 
 
@@ -177,15 +202,25 @@ def test_storage_failure_returns_500(
     client,
     monkeypatch,
 ):
-    monkeypatch.setattr(main, "BUCKET_NAME", "test-bucket")
+    monkeypatch.setattr(
+        main,
+        "BUCKET_NAME",
+        "test-bucket",
+    )
     monkeypatch.setattr(
         main,
         "write_event_to_gcs",
-        Mock(side_effect=RuntimeError("GCS unavailable")),
+        Mock(
+            side_effect=RuntimeError(
+                "GCS unavailable"
+            )
+        ),
     )
 
     envelope = build_pubsub_envelope(
-        payload={"order_id": "order-1002"},
+        payload={
+            "order_id": "order-1002",
+        },
     )
 
     response = client.post("/", json=envelope)

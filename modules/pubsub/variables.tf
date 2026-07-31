@@ -59,3 +59,34 @@ variable "project_id" {
     error_message = "project_id must not be empty."
   }
 }
+
+variable "dead_letter_topic_name" {
+  description = "Name of the Pub/Sub dead-letter topic."
+  type        = string
+}
+
+variable "max_delivery_attempts" {
+  description = "Maximum delivery attempts before forwarding to the dead-letter topic."
+  type        = number
+  default     = 5
+
+  validation {
+    condition = (
+      var.max_delivery_attempts >= 5 &&
+      var.max_delivery_attempts <= 100
+    )
+    error_message = "max_delivery_attempts must be between 5 and 100."
+  }
+}
+
+variable "minimum_backoff" {
+  description = "Minimum retry backoff duration."
+  type        = string
+  default     = "10s"
+}
+
+variable "maximum_backoff" {
+  description = "Maximum retry backoff duration."
+  type        = string
+  default     = "60s"
+}

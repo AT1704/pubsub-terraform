@@ -9,6 +9,11 @@ module "pubsub" {
   push_endpoint              = module.data_mover_cloudrun.service_uri
   push_service_account_email = module.pubsub_push_invoker_iam.service_account_email
   push_audience              = module.data_mover_cloudrun.service_uri
+
+  dead_letter_topic_name = local.dead_letter_topic_name
+  max_delivery_attempts  = 5
+  minimum_backoff        = "10s"
+  maximum_backoff        = "60s"
 }
 
 module "raw_data_bucket" {
@@ -76,4 +81,20 @@ module "artifact_registry" {
     application = "data-mover"
     managed_by  = "terraform"
   }
+}
+
+resource "google_pubsub_topic_iam_member" "dead_letter_publisher" {
+  project = var.project_id
+  topic   = module.pubsub.dead_letter_topic_id
+  role    = "roles/pubsub.publisher"
+
+  member = "serviceAccount:service-${data.google_project.current.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+}
+
+resource "google_pubsub_subscription_iam_member" "dead_letter_subscriber" {
+  project      = var.project_id
+  subscription = module.pubsub.subscription_id
+  role         = "roles/pubsub.subscriber"
+
+  member = "serviceAccount:service-${data.google_project.current.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
 }
