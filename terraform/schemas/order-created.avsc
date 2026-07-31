@@ -1,0 +1,44 @@
+{
+  "type": "record",
+  "name": "OrderCreatedEvent",
+  "namespace": "com.datamover.events",
+  "fields": [
+    {
+      "name": "event_id",
+      "type": "string"
+    },
+    {
+      "name": "event_type",
+      "type": "string"
+    },
+    {
+      "name": "event_version",
+      "type": "string"
+    },
+    {
+      "name": "occurred_at",
+      "type": "string"
+    },
+    {
+      "name": "data",
+      "type": {
+        "type": "record",
+        "name": "OrderData",
+        "fields": [
+          {
+            "name": "order_id",
+            "type": "string"
+          },
+          {
+            "name": "customer",
+            "type": "string"
+          },
+          {
+            "name": "status",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

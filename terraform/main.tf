@@ -6,16 +6,21 @@ module "pubsub" {
   subscription_name             = local.pubsub_subscription_name
   dead_letter_topic_name        = "orders-dead-letter-topic"
   dead_letter_subscription_name = "orders-dead-letter-subscription"
-  ack_deadline_seconds          = 20
+
+  ack_deadline_seconds = 20
 
   push_endpoint              = module.data_mover_cloudrun.service_uri
   push_service_account_email = module.pubsub_push_invoker_iam.service_account_email
   push_audience              = module.data_mover_cloudrun.service_uri
 
-
   max_delivery_attempts = 5
   minimum_backoff       = "10s"
   maximum_backoff       = "60s"
+
+  # NEW
+  schema_name       = "order-created-schema"
+  schema_definition = file("${path.root}/schemas/order-created.avsc")
+  schema_encoding   = "JSON"
 }
 
 module "raw_data_bucket" {

@@ -1,6 +1,19 @@
+resource "google_pubsub_schema" "this" {
+  project    = var.project_id
+  name       = var.schema_name
+  type       = "AVRO"
+  definition = var.schema_definition
+
+}
+
 resource "google_pubsub_topic" "this" {
   project = var.project_id
   name    = var.topic_name
+
+  schema_settings {
+    schema   = google_pubsub_schema.this.id
+    encoding = var.schema_encoding
+  }
 
   lifecycle {
     prevent_destroy = true

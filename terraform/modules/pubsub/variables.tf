@@ -95,3 +95,38 @@ variable "dead_letter_subscription_name" {
   description = "Name of the subscription attached to the dead-letter topic."
   type        = string
 }
+
+variable "schema_name" {
+  description = "Name of the Pub/Sub schema attached to the primary topic."
+  type        = string
+
+  validation {
+    condition     = length(trimspace(var.schema_name)) > 0
+    error_message = "schema_name must not be empty."
+  }
+}
+
+variable "schema_definition" {
+  description = "Avro schema definition used to validate messages published to the primary topic."
+  type        = string
+
+  validation {
+    condition     = length(trimspace(var.schema_definition)) > 0
+    error_message = "schema_definition must not be empty."
+  }
+}
+
+variable "schema_encoding" {
+  description = "Encoding used for messages validated against the Pub/Sub schema."
+  type        = string
+  default     = "JSON"
+
+  validation {
+    condition = contains(
+      ["JSON", "BINARY"],
+      var.schema_encoding
+    )
+
+    error_message = "schema_encoding must be either JSON or BINARY."
+  }
+}

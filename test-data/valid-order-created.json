@@ -1,0 +1,11 @@
+{
+  "event_id": "evt-1001",
+  "event_type": "order.created",
+  "event_version": "1.0",
+  "occurred_at": "2026-07-31T14:45:00Z",
+  "data": {
+    "order_id": "order-1001",
+    "customer": "Ananya Tiwari",
+    "status": "created"
+  }
+}
